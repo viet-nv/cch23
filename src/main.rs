@@ -1,6 +1,7 @@
 use axum::{
     extract::Json,
     extract::Path,
+    http::StatusCode,
     routing::{get, post},
     Router,
 };
@@ -54,23 +55,19 @@ struct Response {
 
 async fn contest(Json(users): Json<Vec<User>>) -> Json<Response> {
     let fastest = users
-        .clone()
-        .into_iter()
+        .iter()
         .max_by(|x, y| x.speed.partial_cmp(&y.speed).unwrap())
         .unwrap();
     let tallest = users
-        .clone()
-        .into_iter()
+        .iter()
         .max_by(|x, y| x.height.partial_cmp(&y.height).unwrap())
         .unwrap();
     let magician = users
-        .clone()
-        .into_iter()
+        .iter()
         .max_by(|x, y| x.snow_magic_power.partial_cmp(&y.snow_magic_power).unwrap())
         .unwrap();
     let consumer = users
-        .clone()
-        .into_iter()
+        .iter()
         .max_by(|x, y| {
             x.candies_eaten_yesterday
                 .partial_cmp(&y.candies_eaten_yesterday)
@@ -102,6 +99,10 @@ async fn contest(Json(users): Json<Vec<User>>) -> Json<Response> {
 async fn main() -> shuttle_axum::ShuttleAxum {
     let router = Router::new()
         .route("/", get(hello_world))
+        .route(
+            "/-1/error",
+            get(|| async { StatusCode::INTERNAL_SERVER_ERROR }),
+        )
         .route("/1/*param", get(xor_pow_3))
         .route("/4/strength", post(strength))
         .route("/4/contest", post(contest));
