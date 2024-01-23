@@ -1,6 +1,5 @@
 use axum::{
-    extract::Json,
-    extract::Path,
+    extract::{Json, Path, Query},
     http::StatusCode,
     routing::{get, post},
     Router,
@@ -95,6 +94,51 @@ async fn contest(Json(users): Json<Vec<User>>) -> Json<Response> {
     })
 }
 
+#[derive(Deserialize)]
+struct QueryParam {
+    offset: Option<usize>,
+    limit: Option<usize>,
+    split: Option<usize>,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum ResponseType {
+    VariantA(Vec<String>),
+    VariantB(Vec<Vec<String>>),
+}
+
+async fn limit_offset(
+    Query(params): Query<QueryParam>,
+    Json(payload): Json<Vec<String>>,
+) -> Json<ResponseType> {
+    let limit = params.limit.unwrap_or(payload.len());
+    let offset = params.offset.unwrap_or(0);
+    let split = params.split;
+
+    let p = &payload[offset..(offset + limit)];
+    if split.is_none() {
+        return Json(ResponseType::VariantA(p.to_vec()));
+    }
+    let mut res: Vec<Vec<String>> = vec![];
+    let mut count = 0;
+    let mut tmp: Vec<String> = vec![];
+    for el in p {
+        tmp.push(el.to_string());
+        count += 1;
+        if count == split.unwrap() {
+            res.push(tmp);
+            tmp = vec![];
+            count = 0;
+        }
+    }
+    if count > 0 {
+        res.push(tmp);
+    }
+
+    Json(ResponseType::VariantB(res))
+}
+
 #[shuttle_runtime::main]
 async fn main() -> shuttle_axum::ShuttleAxum {
     let router = Router::new()
@@ -105,7 +149,8 @@ async fn main() -> shuttle_axum::ShuttleAxum {
         )
         .route("/1/*param", get(xor_pow_3))
         .route("/4/strength", post(strength))
-        .route("/4/contest", post(contest));
+        .route("/4/contest", post(contest))
+        .route("/5", post(limit_offset));
 
     Ok(router.into())
 }
